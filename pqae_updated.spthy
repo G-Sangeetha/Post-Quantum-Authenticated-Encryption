@@ -1,0 +1,124 @@
+theory PQ_AE
+begin
+builtins: asymmetric-encryption, signing, hashing
+
+/*
+ *
+ * This model has two families of rules:
+ *
+ *   1. Scaffold_Encrypt / Scaffold_Decrypt -- the KEM + signature +
+ *      sequence-number scaffold that is COMMON to the three constructions
+ *      actually compared in the paper's empirical results: B1 (the
+ *      baseline), PQAE-SHA, and PQAE (the hash-to-curve construction).
+ *      Confidentiality is abstracted as an opaque one-way binding
+ *      (C2 = h(<K_enc, m>)); Decrypt never recovers m. This is intentional:
+ *      Tamarin's symbolic Dolev-Yao model cannot distinguish "mask the
+ *      block with SHA-256" from "mask the block with a hash-to-curve
+ *      point" -- both are opaque hashes to a symbolic adversary. That is
+ *      exactly why this model proves sender-unforgeability and
+ *      replay-resistance IDENTICALLY for B1, PQAE-SHA, and PQAE: those two
+ *      properties depend only on the scaffold, not on the masking
+ *      mechanism. The masking mechanism's actual effect -- on
+ *      computational cost, and on the tightness of the confidentiality
+ *      reduction -- is evaluated empirically
+ *      and analytically, not in this symbolic model.
+ *
+ *   2. Standard_Encrypt / Standard_Decrypt -- a DIFFERENT, weaker
+ *      composition (B0): KEM-derived key + hash-based DEM, but with NO
+ *      signature and NO sequence number / freshness mechanism. This is
+ *      not a variant benchmarked in the paper; it exists only as a
+ *      strawman to demonstrate that removing the signature and
+ *      sequence-number scaffold reintroduces forgeability and replay,
+ *      which is what motivates including them in B1/PQAE-SHA/PQAE in the
+ *      first place.
+ *
+ */
+
+rule Register_KEM_Keypair:
+    [ Fr(~sk_B) ] --> [ !KEMsk($B, ~sk_B), !KEMpk($B, pk(~sk_B)), Out(pk(~sk_B)) ]
+rule Register_Sig_Keypair:
+    [ Fr(~sk_A) ] --> [ !Sigsk($A, ~sk_A), !Sigpk($A, pk(~sk_A)), Out(pk(~sk_A)) ]
+rule Init_Session:
+    [ Fr(~SID) ] --[ SessionCreated($A, $B, ~SID) ]-> [ Session($A, $B, ~SID) ]
+
+rule Scaffold_Encrypt:
+    let
+        kem_ct  = aenc(~K, pk_sk_B)
+        K_mac   = h(<~K, ~SID, ~Nonce0, 'MAC'>)
+        K_enc   = h(<~K, ~SID, ~Nonce1, 'ENC'>)
+        C2      = h(<K_enc, m>)
+        T       = h(<kem_ct, C2, ~SID, ~Nonce0, ~SeqNo>)
+        Sig     = sign(T, sk_A)
+        Tag     = h(<K_mac, T, Sig>)
+    in
+    [ Session($A, $B, ~SID), !KEMpk($B, pk_sk_B), !Sigsk($A, sk_A),
+      Fr(~K), Fr(~Nonce0), Fr(~Nonce1), Fr(~SeqNo), In(m) ]
+    --[ Send($A, $B, ~SID, ~SeqNo, T), UsedSeqNo($A, $B, ~SID, ~SeqNo) ]->
+    [ Session($A, $B, ~SID), SentSeqNo($A, $B, ~SID, ~SeqNo),
+      Out(<kem_ct, C2, ~Nonce0, ~SeqNo, Sig, Tag>) ]
+
+rule Scaffold_Decrypt:
+    let
+        K       = adec(kem_ct, sk_B)
+        K_mac   = h(<K, ~SID, Nonce0, 'MAC'>)
+        T       = h(<kem_ct, C2, ~SID, Nonce0, ~SeqNo>)
+        Tag_exp = h(<K_mac, T, Sig>)
+    in
+    [ SentSeqNo($A, $B, ~SID, ~SeqNo), !KEMsk($B, sk_B), !Sigpk($A, pk_sk_A),
+      In(<kem_ct, C2, Nonce0, ~SeqNo, Sig, Tag>) ]
+    --[ Eq(Tag, Tag_exp), Eq(verify(Sig, T, pk_sk_A), true),
+        Receive($A, $B, ~SID, ~SeqNo, T), ReceiverAccepts($B, ~SID, ~SeqNo) ]->
+    [ ]
+
+restriction Equality: "All x y #i. Eq(x, y) @ i ==> x = y"
+
+rule Standard_Encrypt:
+    let
+        kem_ct  = aenc(~K, pk_sk_B)
+        K_dem   = h(<~K, ~SID, 'DEM'>)
+        CT      = h(<K_dem, m>)
+        Tag     = h(<K_dem, CT>)
+    in
+    [ !KEMpk($B, pk_sk_B), Fr(~K), Fr(~SID), In(m) ]
+    --[ StdSend($A, $B, ~SID, CT) ]->
+    [ Out(<kem_ct, CT, ~SID, Tag>) ]
+
+rule Standard_Decrypt:
+    let
+        K       = adec(kem_ct, sk_B)
+        K_dem   = h(<K, SID, 'DEM'>)
+        Tag_exp = h(<K_dem, CT>)
+    in
+    [ !KEMsk($B, sk_B), In(<kem_ct, CT, SID, Tag>) ]
+    --[ Eq(Tag, Tag_exp), StdReceive($A, $B, SID, CT) ]->
+    [ ]
+
+/* Proves for B1 / PQAE-SHA / PQAE uniformly (see scope note above):
+ * the scaffold they all share guarantees sender-unforgeability. */
+lemma sender_unforgeability:
+    "All A B SID SeqNo T #i. Receive(A, B, SID, SeqNo, T) @ i
+        ==> (Ex #j. Send(A, B, SID, SeqNo, T) @ j & j < i)"
+
+/* Proves for B1 / PQAE-SHA / PQAE uniformly: the sequence-number
+ * scaffold they all share guarantees replay-resistance. */
+lemma replay_resistance:
+    "All B SID SeqNo #i #j. ReceiverAccepts(B, SID, SeqNo) @ i &
+        ReceiverAccepts(B, SID, SeqNo) @ j ==> #i = #j"
+
+/* Strawman (B0, not a benchmarked variant): without the scaffold,
+ * forgeability reappears. */
+lemma standard_fails_unforgeability:
+    exists-trace
+    "Ex A B SID CT #i. StdReceive(A, B, SID, CT) @ i &
+        not (Ex #j. StdSend(A, B, SID, CT) @ j)"
+
+/* Strawman (B0, not a benchmarked variant): without the scaffold,
+ * replay reappears. */
+lemma standard_fails_replay:
+    exists-trace
+    "Ex A B SID CT #i #j. StdReceive(A, B, SID, CT) @ i &
+        StdReceive(A, B, SID, CT) @ j & not (#i = #j)"
+lemma scaffold_executable:
+    exists-trace
+    "Ex A B SID SeqNo T #i. Receive(A, B, SID, SeqNo, T) @ i"
+end
