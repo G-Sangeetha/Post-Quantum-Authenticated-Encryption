@@ -9,7 +9,7 @@
 | `tamarin_output.html` | Full Tamarin prover output, including attack-trace graphs for the two exists-trace lemmas |
 | `results_main_sender.json`, `results_main_receiver.json`, `results_baseline_sender.json`, `results_baseline_receiver.json` | IoT networked timing benchmark, $N=100$ per size, 16–1024 B, main construction and standard baseline |
 | `ablation_results_desktop.json`, `ablation_results_pi.json` | Ablation study (B1 / PQAE-SHA / PQAE) timing and peak-memory data, both platforms |
-| `energy_runsheet.xlsx` | IoT energy measurement, 3 repetitions per construction per size, raw and net figures with dual-meter cross-check |
+| `energy_results_final.csv` | IoT energy measurement, 3 repetitions per construction per size, raw and net figures with dual-meter cross-check |
 
 ## Reproducing the desktop results
 
@@ -47,5 +47,5 @@ tamarin-prover pqae_updated.spthy --prove --output=tamarin_output.html
 
 ## IoT deployment data
 
-JSON files report per-size summary statistics (mean, standard deviation, median, min/max, 95% CI) over repeated trials from two networked Raspberry Pi 4 boards communicating over TCP. `energy_runsheet.xlsx` records three independent repetitions per (construction, size) pair, with dual inline power meter readings (raw and idle-subtracted net energy) and the meter cross-check run.
+JSON files report per-size summary statistics (mean, standard deviation, median, min/max, 95% CI) over repeated trials from two networked Raspberry Pi 4 boards communicating over TCP. `energy_results_final.csv` records three independent repetitions per (construction, size) pair, with dual inline power meter readings (raw and idle-subtracted net energy) and the meter cross-check run.
 
