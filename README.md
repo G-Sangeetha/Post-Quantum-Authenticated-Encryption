@@ -9,7 +9,8 @@
 | `tamarin_output.html` | Full Tamarin prover output, including attack-trace graphs for the two exists-trace lemmas |
 | `results_main_sender.json`, `results_main_receiver.json`, `results_baseline_sender.json`, `results_baseline_receiver.json` | IoT networked timing benchmark, $N=100$ per size, 16–1024 B, main construction and standard baseline |
 | `ablation_results_desktop.json`, `ablation_results_pi.json` | Ablation study (B1 / PQAE-SHA / PQAE) timing and peak-memory data, both platforms |
-| `energy_results_final.csv` | IoT energy measurement, 3 repetitions per construction per size, raw and net figures with dual-meter cross-check |
+| `energy_runsheet.csv` | Raw energy measurement log: per-repetition start/end power-meter readings (mWh) and timestamps for both boards, across all constructions, sizes, and the idle/meter-swap calibration runs |
+| `energy_results_final.csv` | IoT energy measurement, 3 repetitions per construction per size, raw and net figures with dual-meter cross-check — derived directly from `energy_runsheet.csv` |
 
 ## Reproducing the desktop results
 
@@ -47,5 +48,6 @@ tamarin-prover pqae_updated.spthy --prove --output=tamarin_output.html
 
 ## IoT deployment data
 
-JSON files report per-size summary statistics (mean, standard deviation, median, min/max, 95% CI) over repeated trials from two networked Raspberry Pi 4 boards communicating over TCP. `energy_results_final.csv` records three independent repetitions per (construction, size) pair, with dual inline power meter readings (raw and idle-subtracted net energy) and the meter cross-check run.
+JSON files report per-size summary statistics (mean, standard deviation, median, min/max, 95% CI) over repeated trials from two networked Raspberry Pi 4 boards communicating over TCP.
 
+Energy is recorded at two levels. `energy_runsheet.csv` is the raw log: each row is one timed repetition, giving the start and end accumulated-energy reading (mWh) and timestamp for both the sender and receiver boards' inline power meters, for every (construction, message size) pair, plus the idle-draw runs and the meter-swap calibration run used for the cross-check reported in the manuscript. `energy_results_final.csv` is derived from it directly: per-repetition energy is the end-minus-start mWh delta converted to mJ, divided by the trial count (`n_trials`) for per-operation energy, and divided by elapsed time for average power; idle draw (from the `idle` rows) is subtracted to give the net, workload-only figure alongside the raw total; mean, standard deviation, and 95% confidence intervals are then computed across the three repetitions per (construction, board, size) cell. Recomputing any cell of `energy_results_final.csv` from the corresponding rows of `energy_runsheet.csv` reproduces the reported value exactly.
