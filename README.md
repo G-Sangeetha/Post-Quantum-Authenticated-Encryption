@@ -6,7 +6,10 @@
 |---|---|
 | `PQ-Authenticated-Encryption.ipynb` | Desktop prototype: construction, correctness/security test suite, hash-to-curve validation, timing side-channel analysis, parameter/signature sweeps, head-to-head and component-breakdown benchmarks |
 | `pqae_updated.spthy` | Tamarin model: shared scaffold (B1/PQAE-SHA/PQAE) and the weaker standard-composition strawman (B0), 5 lemmas |
-| `tamarin_output.html` | Full Tamarin prover output, including attack-trace graphs for the two exists-trace lemmas |
+| `tamarin_output.txt` | Full Tamarin prover output (`--prove` proof script) for all 5 lemmas |
+| `standard_fail_unforgeability.png` | Attack-trace graph for `standard_fails_unforgeability`, exported from Tamarin's interactive mode |
+| `Standard_fails_replay.png` | Attack-trace graph for `standard_fails_replay`, exported from Tamarin's interactive mode |
+| `scaffold_executable.png` | Witness trace for `scaffold_executable`, confirming an honest run reaches acceptance |
 | `results_main_sender.json`, `results_main_receiver.json`, `results_baseline_sender.json`, `results_baseline_receiver.json` | IoT networked timing benchmark, $N=100$ per size, 16–1024 B, main construction and standard baseline |
 | `ablation_results_desktop.json`, `ablation_results_pi.json` | Ablation study (B1 / PQAE-SHA / PQAE) timing and peak-memory data, both platforms |
 | `energy_runsheet.csv` | Raw energy measurement log: per-repetition start/end power-meter readings (mWh) and timestamps for both boards, across all constructions, sizes, and the idle/meter-swap calibration runs |
@@ -39,12 +42,13 @@ standard_fails_replay (exists-trace): verified (12 steps)
 scaffold_executable (exists-trace): verified (13 steps)
 ```
 
+This text output, reproduced in full in `tamarin_output.txt`, is sufficient evidence for the two all-traces lemmas (`sender_unforgeability`, `replay_resistance`), whose proofs are branching case-split trees rather than a single trace. The three exists-trace lemmas additionally have a single witness graph each; these are not produced by `--prove` and must be exported from interactive mode:
 
-To regenerate the full HTML output with attack-trace graphs:
 ```bash
-tamarin-prover pqae_updated.spthy --prove --output=tamarin_output.html
+tamarin-prover interactive pqae_updated.spthy
 ```
 
+Open `http://localhost:3001`, select the `pqae_updated.spthy` theory, open each exists-trace lemma, run autoprove from the Actions menu if it has not already resolved, and export the rendered constraint graph. The three graphs included here (`tamarin_standard_forgery.png`, `tamarin_standard_replay.png`, `tamarin_scaffold_executable.png`) were produced this way and also appear in Appendix A of the manuscript.
 
 ## IoT deployment data
 
